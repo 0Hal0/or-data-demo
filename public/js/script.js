@@ -31,15 +31,40 @@ async function getServicesOfType(type){
     return services;
 }
 
+function convertStatus(status){
+    statusDict = {
+        active: "Active",
+        inactive: "Inactive",
+    }
+    return statusDict[status];
+}
+
+function removeHTMLTags(text){
+    //To Implement
+    return text;
+}
+
 async function postServicesToEndpoint(services){
     baseID = "app2aHT8MrG4nYq4H";
     servicesTableID = "tblHXa2jQ3OHjfczf";
-    var orFormatServices = services.map(x => ({fields: {name: x.name, description: x.description}}))
+    var orFormatServices = services.map(x => (
+        {
+            fields: 
+            {
+                name: x.name,
+                description: x.description,
+                url: x.url,
+                email: x.email,
+                status: convertStatus(x.status),
+                //programs?
+                //organizations: x.organization.id
+            }}))
     if(orFormatServices.length > 10){
         orFormatServices = orFormatServices.slice(0, 10);
     }
+    console.log(orFormatServices);
     body = {records: orFormatServices}
-
+    console.log(body);
     await postToAirtable(baseID, servicesTableID, JSON.stringify(body));
 }
 
