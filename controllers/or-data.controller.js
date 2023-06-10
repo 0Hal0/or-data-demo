@@ -9,7 +9,7 @@ const baseId = process.env.AIRTABLE_BASE_ID;
 const servicesTableId = process.env.SERVICES_TABLE_ID;
 const orgTableId = process.env.ORGANIZATION_TABLE_ID;
 const contactsTableId = process.env.CONTACTS_TABLE_ID;
-const phonesTableId = process.env.PHONE_TABLE_ID;
+const phonesTableId = process.env.PHONES_TABLE_ID;
 
 exports.updateTables = async (type) => {
     services = await getServicesOfType(type);
@@ -79,25 +79,39 @@ async function postServicesToEndpoint(orServices){
         //Post organization
         airTableOrg = await postOrg(orService, airTableService);
         //Post contact
-        airTableContact = await postContacts(orService, airTableService);
-        //Post phones
+        await postContactsAndPhones(orService, airTableService);
     }
 }
 
-async function postContacts(orService, airTableService){
-    contacts = orService["contacts"]
-    contacts = contacts.map(x => (
-        {
+async function postContactsAndPhones(orService, airTableService){
+    contacts = orService["contacts"];
+    for(let i = 0; i < contacts.length; i++){
+        contact = {
             fields: {
-                name: x.name,
-                title: x.title,
-                email: x.email,
-                services: [airTableService["records"][0]["id"]]
+                name: contacts[i].name,
+                title: contacts[i].title,
+                email: contacts[i].email,
+                services: [airTableService["records"][0]["id"]],
             }
         }
-    ))
-    body = {records : contacts};
-    return await postToAirtable(baseId, contactsTableId, JSON.stringify(body));
+        body = {records : [contact]};
+        airTableContact = await postToAirtable(baseId, contactsTableId, JSON.stringify(body));
+
+        phones = contacts[i].phones;
+        console.log(phones);
+        for(let j=0; j<phones.length; j++){
+            phone = {
+                fields: {
+                    number: phones[j].number,
+                    contacts: [airTableContact["records"][0]["id"]],
+                }
+            }
+            body = {records : [phone]};
+            phone = await postToAirtable(baseId, phonesTableId, JSON.stringify(body));
+            console.log(phone);
+        }
+
+    }
 }
 
 async function getService(serviceId){
