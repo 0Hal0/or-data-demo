@@ -6,9 +6,13 @@ const app = express();
 const path = require("path");
 
 const port = process.env.PORT;
-SERVICE_TYPES_URI = process.env.SERVICE_TYPES_URI
-SERVICES_URI = process.env.SERVICES_URI
-ACCESS_TOKEN = process.env.ACCESS_TOKEN
+const SERVICE_TYPES_URI = process.env.SERVICE_TYPES_URI
+const SERVICES_URI = process.env.SERVICES_URI
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN
+ 
+const baseID = process.env.AIRTABLE_BASE_ID
+const servicesTableID = process.env.SERVICES_TABLE_ID
+const orgTableID = process.env.ORGANIZATION_TABLE_ID
 
 app.use(express.urlencoded({ extended: true}));
 app.use(express.json());
@@ -58,10 +62,57 @@ function removeHTMLTags(text){
     return text;
 }
 
-async function postServicesToEndpoint(services){
-    baseID = "app2aHT8MrG4nYq4H";
-    servicesTableID = "tblHXa2jQ3OHjfczf";
-    var orFormatServices = services.map(x => (
+async function postServicesToEndpoint(orServices){
+    orServices = orServices.slice(0, 3);
+    for(let i=0; i < orServices.length; i++ ){
+        //Post Service
+        airTableService = await postService(orServices[i]);
+        //Post organization
+        airTableOrg = await postOrg(orServices[i], airTableService);
+        //Post contacts
+        
+    }
+}
+
+async function postOrg(orService, airTableService){
+    org = {
+        fields: {
+            name: orService["organization"]["name"],
+            description: orService["organization"]["description"],
+            website: orService["organization"]["url"],
+            services: [airTableService["records"][0]["id"]]
+        }
+    }
+    body = {records : [org]};
+    airTableOrg = await postToAirtable(baseID, orgTableID, JSON.stringify(body));
+}
+
+async function postService(orService){
+    service = {
+        fields: {
+            name: orService["name"],
+            description: orService["description"],
+            url: orService["url"],
+            email: orService["email"],
+            status: orService["status"],
+            interpretation_services: orService["interpretation_services"],
+            application_process : orService["application_process"],
+            fees_description : orService["fees_description"],
+            accreditations : orService["accreditations"],
+            eligibility_description : orService["eligibility_description"],
+            minimum_age : orService["minimum_age"],
+            maximum_age : orService["maximum_age"],
+            assured_date : orService["assured_date"],
+            assurer_email : orService["assurer_email"],
+        }
+    }
+    body = {records : [service]};
+    return await postToAirtable(baseID, servicesTableID, JSON.stringify(body));
+}
+
+
+async function postServicesToEndpoint_old(orServices){
+    var orFormatServices = orServices.map(x => (
         {
             fields: 
             {
@@ -79,15 +130,18 @@ async function postServicesToEndpoint(services){
     console.log(orFormatServices);
     body = {records: orFormatServices};
     console.log(body);
-    response = await postToAirtable(baseID, servicesTableID, JSON.stringify(body));
+    airTableServices = await postToAirtable(baseID, servicesTableID, JSON.stringify(body));
     //loop through services and post all other data.
+    for(let i=0; i < orFormatServices.length; i++){
+        console.log(orFormatServices[i]["id"]);
+    }
 }
 
 
 
 async function postToAirtable(baseID, tableID, body){
     airTableUrl = "https://api.airtable.com/v0";
-    response = await fetch(airTableUrl + "/" + baseID + "/" + tableID,
+    result = await fetch(airTableUrl + "/" + baseID + "/" + tableID,
     {
         method: "POST",
         headers: new Headers({
@@ -104,7 +158,7 @@ async function postToAirtable(baseID, tableID, body){
         console.log(error);
         throw error;
     })
-    return response
+    return result
 }
 
 app.listen(port, () => console.log(`Listending on port ${port}`));
