@@ -8,6 +8,8 @@ const SINGLE_SERVICE_URI = process.env.SINGLE_SERVICE_URI;
 const baseId = process.env.AIRTABLE_BASE_ID;
 const servicesTableId = process.env.SERVICES_TABLE_ID;
 const orgTableId = process.env.ORGANIZATION_TABLE_ID;
+const contactsTableId = process.env.CONTACTS_TABLE_ID;
+const phonesTableId = process.env.PHONE_TABLE_ID;
 
 exports.updateTables = async (type) => {
     services = await getServicesOfType(type);
@@ -16,7 +18,7 @@ exports.updateTables = async (type) => {
 }
 
 exports.clearBase = async () => {
-    tables = [servicesTableId, orgTableId]
+    tables = [servicesTableId, orgTableId, contactsTableId, phonesTableId]
     for(let i=0;i<tables.length;i++){
         //get records
         records = await fetch("https://api.airtable.com/v0/" + baseId + "/" + tables[i],
@@ -29,8 +31,9 @@ exports.clearBase = async () => {
         records = await records.json();
         //delete records
         records = records["records"];
+        if (records == null){continue;}
         for(let j=0;j<records.length;j++){
-            fetch("https://api.airtable.com/v0/" + baseId + "/" + tables[i] + "/" + records[j]["id"],
+            await fetch("https://api.airtable.com/v0/" + baseId + "/" + tables[i] + "/" + records[j]["id"],
             {
                 method: "DELETE",
                 headers: new Headers({
@@ -76,8 +79,25 @@ async function postServicesToEndpoint(orServices){
         //Post organization
         airTableOrg = await postOrg(orService, airTableService);
         //Post contact
-        
+        airTableContact = await postContacts(orService, airTableService);
+        //Post phones
     }
+}
+
+async function postContacts(orService, airTableService){
+    contacts = orService["contacts"]
+    contacts = contacts.map(x => (
+        {
+            fields: {
+                name: x.name,
+                title: x.title,
+                email: x.email,
+                services: [airTableService["records"][0]["id"]]
+            }
+        }
+    ))
+    body = {records : contacts};
+    return await postToAirtable(baseId, contactsTableId, JSON.stringify(body));
 }
 
 async function getService(serviceId){
@@ -98,7 +118,7 @@ async function postOrg(orService, airTableService){
         }
     }
     body = {records : [org]};
-    airTableOrg = await postToAirtable(baseId, orgTableId, JSON.stringify(body));
+    return await postToAirtable(baseId, orgTableId, JSON.stringify(body));
 }
 
 async function postService(orService){

@@ -32,18 +32,26 @@ app.post("/:type", (req, res) =>{
     let type = req.params.type;
     try{
         orController.updateTables(type);
+        res.status(201);
+        res.send("Success");
     }catch(error){
         res.status(500);
         res.send(error);
         console.log(error);
-        return;
     }
-    res.status(201);
-    res.send("Success");
+
 })
 
 app.delete("/all", (req, res) =>{
-    orController.clearBase();
+    try{
+        orController.clearBase();
+        res.status(200);
+        res.send("Success");
+    }catch(error){
+        console.log(error);
+        res.status(500);
+        res.send(error);
+    }
 })
 
 
