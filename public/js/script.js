@@ -1,6 +1,5 @@
 SERVICE_TYPES_URI = "https://penninelancs.openplace.directory/o/ServiceDirectoryService/v2/taxonomies/?per_page=5000&vocabulary=esdServiceTypes";
 SERVICES_URI = "https://penninelancs.openplace.directory/o/ServiceDirectoryService/v2/services/local/?per_page=5000&service_type="
-ACCESS_TOKEN = "patBW3t4n3ebFIUBn.08d2769abf211012356fece8f65f8198ba07d74d4a459460ac8e017776564498"
 
 async function getServiceTypes(){
     serviceTypes = await fetch(SERVICE_TYPES_URI)
@@ -16,6 +15,12 @@ async function getServiceTypes(){
 }
 
 async function update(){
+    type = document.getElementById("service-type-input");
+    type = document.getElementById(type.value);
+    result = await fetch("http://localhost:3000/" + type.innerHTML, {method: "POST"})
+}
+
+async function update_old(){
     type = document.getElementById("service-type-input");
     type = document.getElementById(type.value);
     services = await getServicesOfType(type.innerHTML);
@@ -63,7 +68,7 @@ async function postServicesToEndpoint(services){
         orFormatServices = orFormatServices.slice(0, 10);
     }
     console.log(orFormatServices);
-    body = {records: orFormatServices}
+    body = {records: orFormatServices};
     console.log(body);
     await postToAirtable(baseID, servicesTableID, JSON.stringify(body));
 }
