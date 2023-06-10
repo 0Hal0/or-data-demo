@@ -104,6 +104,7 @@ async function postContactsAndPhones(orService, airTableService){
                 fields: {
                     number: phones[j].number,
                     contacts: [airTableContact["records"][0]["id"]],
+                    services: [airTableService["records"][0]["id"]],
                 }
             }
             body = {records : [phone]};
