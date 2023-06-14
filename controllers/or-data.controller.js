@@ -32,32 +32,36 @@ exports.clearBase = async () => {
     ]
     for(let i=0;i<tables.length;i++){
         //get records
-        records = await fetch("https://api.airtable.com/v0/" + baseId + "/" + tables[i],
-        {
-            headers: new Headers({
-                "Authorization": "Bearer " + ACCESS_TOKEN,
-                "Content-Type": "application/json"
-            })
-        });
-        records = await records.json();
-        //delete records
-        records = records["records"];
-        if (records == null){continue;}
-        for(let j=0;j<records.length;j++){
-            await fetch("https://api.airtable.com/v0/" + baseId + "/" + tables[i] + "/" + records[j]["id"],
+        records = [1];
+        console.log(i);
+        while(records.length != 0){
+            records = await fetch("https://api.airtable.com/v0/" + baseId + "/" + tables[i],
             {
-                method: "DELETE",
                 headers: new Headers({
                     "Authorization": "Bearer " + ACCESS_TOKEN,
                     "Content-Type": "application/json"
                 })
-            })
-            .then((response) => response.json())
-            .then((data) => console.log(data))
-            .catch((error) => console.log(error));
+            });
+            records = await records.json();
+            //delete records
+            records = records["records"];
+
+            for(let j=0;j<records.length;j++){
+                await fetch("https://api.airtable.com/v0/" + baseId + "/" + tables[i] + "/" + records[j]["id"],
+                {
+                    method: "DELETE",
+                    headers: new Headers({
+                        "Authorization": "Bearer " + ACCESS_TOKEN,
+                        "Content-Type": "application/json"
+                    })
+                })
+                .then((response) => response.json())
+                .catch((error) => console.log(error));
+            }
         }
 
     }
+    console.log("done");
 }
 
 async function getServicesOfType(type){
@@ -81,25 +85,27 @@ function removeHTMLTags(text){
 }
 
 async function postServicesToEndpoint(orServices){
-    orServices = orServices.slice(0, 3);
+    //orServices = orServices.slice(0, 3);
     for(let i=0; i < orServices.length; i++ ){
-        //Get service details
-        orService = await getService(orServices[i]["id"]);
-        //Post Service
-        airTableService = await postService(orService);
-        airTableService = airTableService["records"][0];
-        //Post organization
-        airTableOrg = await postOrg(orService, airTableService);
-        airTableOrg = airTableOrg["records"][0];
-        airTableService["organization"] = airTableOrg;
-        //Post contact
-        airTableContacts = await postContactsAndPhones(orService, airTableService);
-        if (airTableContacts != null){
-            airTableService["contacts"] = airTableContacts;
-        }else{ airTableService["contacts"] = []; }
-        
-        //Post service_at_location info
-        await postServiceAtLoction(orService, airTableService);
+        try{//bad
+            //Get service details
+            orService = await getService(orServices[i]["id"]);
+            //Post Service
+            airTableService = await postService(orService);
+            airTableService = airTableService["records"][0];
+            //Post organization
+            airTableOrg = await postOrg(orService, airTableService);
+            airTableOrg = airTableOrg["records"][0];
+            airTableService["organization"] = airTableOrg;
+            //Post contact
+            airTableContacts = await postContactsAndPhones(orService, airTableService);
+            if (airTableContacts != null){
+                airTableService["contacts"] = airTableContacts;
+            }else{ airTableService["contacts"] = []; }
+
+            //Post service_at_location info
+            await postServiceAtLoction(orService, airTableService);
+        }catch(error){console.log(error);}
     }
 }
 
@@ -143,18 +149,17 @@ async function postServiceAtLoction(orService, airTableService){
             fields: {
                 name: serviceAtLocations[i]["location"]["name"],
                 services: [airTableService["id"]],
-                organization: [airTableService["organization"]["id"]],
-                contacts: [airTableService["contacts"][0]["id"]],
-                phones: [airTableService["contacts"][0]["phones"][0]["id"]],
-                schedules: [airTableSchedule["id"]],
-                service_at_location: [airTableServiceAtLocation["id"]],
+                organization: [airTableService["organization"]?.id],
+                contacts: [airTableService["contacts"][0]?.id],
+                phones: [airTableService["contacts"][0]["phones"][0]?.id],
+                schedules: [airTableSchedule?.id],
+                service_at_location: [airTableServiceAtLocation?.id],
             }
         }
+        location.fields = removeNullFields(location.fields);
         body = {records : [location]};
         airTableLocation = await postToAirtable(baseId, locationsTableId, JSON.stringify(body));
-        console.log(airTableLocation);
-        airTableLocation = airTableLocation["records"][0];
-        console.log(airTableLocation);
+        airTableLocation = airTableLocation?.records[0];
 
     }
 
