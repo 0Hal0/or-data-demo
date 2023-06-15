@@ -1,4 +1,5 @@
 const dotenv = require("dotenv");
+const axios = require("axios");
 
 const SERVICE_TYPES_URI = process.env.SERVICE_TYPES_URI;
 const SERVICES_URI = process.env.SERVICES_URI;
@@ -21,54 +22,62 @@ exports.updateTables = async (type) => {
 }
 
 exports.clearBase = async () => {
-    tables = [
-        servicesTableId,
-        orgTableId, 
-        contactsTableId, 
-        phonesTableId, 
-        serviceAtLocationsTableId,
-        schedulesTableId,
-        locationsTableId,
-    ]
-    for(let i=0;i<tables.length;i++){
-        //get records
-        records = [1];
-        console.log(i);
-        while(records.length != 0){
-            records = await fetch("https://api.airtable.com/v0/" + baseId + "/" + tables[i],
+    const tables = [
+      servicesTableId,
+      orgTableId,
+      contactsTableId,
+      phonesTableId,
+      serviceAtLocationsTableId,
+      schedulesTableId,
+      locationsTableId,
+    ];
+  
+    for (let i = 0; i < tables.length; i++) {
+      let records = [1];
+      console.log(i);
+      while (records.length != 0) {
+        try {
+          const response = await axios.get(
+            `https://api.airtable.com/v0/${baseId}/${tables[i]}`,
             {
-                headers: new Headers({
-                    "Authorization": "Bearer " + ACCESS_TOKEN,
-                    "Content-Type": "application/json"
-                })
-            });
-            records = await records.json();
-            //delete records
-            records = records["records"];
-
-            for(let j=0;j<records.length;j++){
-                await fetch("https://api.airtable.com/v0/" + baseId + "/" + tables[i] + "/" + records[j]["id"],
-                {
-                    method: "DELETE",
-                    headers: new Headers({
-                        "Authorization": "Bearer " + ACCESS_TOKEN,
-                        "Content-Type": "application/json"
-                    })
-                })
-                .then((response) => response.json())
-                .catch((error) => console.log(error));
+              headers: {
+                Authorization: `Bearer ${ACCESS_TOKEN}`,
+                "Content-Type": "application/json",
+              },
             }
+          );
+          records = response.data.records;
+  
+          for (let j = 0; j < records.length; j++) {
+            await axios.delete(
+              `https://api.airtable.com/v0/${baseId}/${tables[i]}/${records[j].id}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${ACCESS_TOKEN}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+          }
+        } catch (error) {
+          console.log(error);
+          throw error;
         }
-
+      }
     }
+  
     console.log("done");
-}
+};
 
-async function getServicesOfType(type){
-    services = await fetch(SERVICES_URI + String(type));
-    services = await services.json();
-    services = services["content"]
-    return services;
+async function getServicesOfType(type) {
+    try {
+        let response = await axios.get(SERVICES_URI + String(type));
+        let services = response.data.content;
+        return services;
+    } catch (error) {
+        console.log(error);
+        throw error;
+    }
 }
 
 function convertStatus(status){
@@ -79,13 +88,33 @@ function convertStatus(status){
     return statusDict[status];
 }
 
+function convertByDayField(byday){
+    value = [];
+    if(byday.includes("MO")){
+        value.push("Monday");
+    }if(byday.includes("TU")){
+        value.push("Tuesday");
+    }if(byday.includes("WE")){
+        value.push("Wednesday");
+    }if(byday.includes("TH")){
+        value.push("Thursday");
+    }if(byday.includes("FR")){
+        value.push("Friday");
+    }if(byday.includes("SA")){
+        value.push("Saturday");
+    }if(byday.includes("SU")){
+        value.push("Sunday");
+    }
+    return value;
+}
+
 function removeHTMLTags(text){
     //To Implement
     return text;
 }
 
 async function postServicesToEndpoint(orServices){
-    //orServices = orServices.slice(0, 3);
+    orServices = orServices.slice(0, 10);
     for(let i=0; i < orServices.length; i++ ){
         try{//bad
             //Get service details
@@ -135,11 +164,12 @@ async function postServiceAtLoction(orService, airTableService){
             
         //schedules
         schedule = serviceAtLocations[i]["regular_schedule"][0];
-        schedule["services"] = [airTableService["id"]]
+        schedule["services"] = [airTableService["id"]];
         schedule["service_at_location"] = [airTableServiceAtLocation["id"]];
         schedule["closes_at"] = convertTime(schedule["closes_at"]);
         schedule["opens_at"] = convertTime(schedule["opens_at"]);
-        delete schedule["id"]
+        schedule["byday"] = convertByDayField(schedule["byday"]);
+        delete schedule["id"];
         schedule = removeNullFields(schedule);
         body = {records : [{fields : schedule}]};
         airTableSchedule = await postToAirtable(baseId, schedulesTableId, JSON.stringify(body));
@@ -216,12 +246,16 @@ async function postContactsAndPhones(orService, airTableService){
 }
 
 async function getService(serviceId){
-    service = await fetch(SINGLE_SERVICE_URI + serviceId)
-    .then((response) => response.json())
-    .then((data) => {return data;})
-    .catch((error) => console.log(error))
-    return service
+    try{
+        let response = await axios.get(SINGLE_SERVICE_URI + String(serviceId));
+        let service = response.data;
+        return service;
+    }catch (error){
+        console.log(error);
+        throw error
+    }
 }
+
 
 async function postOrg(orService, airTableService){
     org = {
@@ -260,27 +294,22 @@ async function postService(orService){
 }
 
 
-
-
-
-async function postToAirtable(baseID, tableID, body){
-    airTableUrl = "https://api.airtable.com/v0";
-    result = await fetch(airTableUrl + "/" + baseID + "/" + tableID,
-    {
-        method: "POST",
-        headers: new Headers({
-            "Authorization": "Bearer " + ACCESS_TOKEN,
-            "Content-Type": "application/json"
-        }),
-        body: body
-    })
-    .then((response) => response.json())
-    .then((data) => {
-        return data;
-    })
-    .catch((error) => {
-        console.log(error);
-        throw error;
-    })
-    return result
-}
+async function postToAirtable(baseID, tableID, body) {
+    const airTableUrl = `https://api.airtable.com/v0/${baseID}/${tableID}`;
+  
+    try {
+      const response = await axios.post(airTableUrl, body, {
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+  
+      return response.data;
+    } catch (error) {
+        if (error.response){
+            console.log(error.response.data);
+        }
+      throw error;
+    }
+  }
