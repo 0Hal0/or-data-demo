@@ -89,6 +89,7 @@ function convertStatus(status){
 }
 
 function convertByDayField(byday){
+    if (!byday){return;}
     value = [];
     if(byday.includes("MO")){
         value.push("Monday");
