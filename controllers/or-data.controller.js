@@ -117,30 +117,46 @@ function removeHTMLTags(text){
 async function postServicesToEndpoint(orServices){
     orServices = orServices.slice(0, 10);
     for(let i=0; i < orServices.length; i++ ){
-        try{//bad
-            //Get service details
+        //Get service details
+        try{
             orService = await getService(orServices[i]["id"]);
-            //Post Service
-            airTableService = await postService(orService);
-            airTableService = airTableService["records"][0];
-            //Post organization
+        }catch(error){
+            console.log("Error posting service " + error.message);
+        }
+        //Post Service
+        airTableService = await postService(orService);
+        airTableService = airTableService["records"][0];
+        //Post organization
+        try{
             airTableOrg = await postOrg(orService, airTableService);
-            airTableOrg = airTableOrg["records"][0];
-            airTableService["organization"] = airTableOrg;
-            //Post contact
+        }catch{
+            console.log("Error posting organization " + error.message);
+        }
+        airTableOrg = airTableOrg["records"][0];
+        airTableService["organization"] = airTableOrg;
+        //Post contact
+        try{
             airTableContacts = await postContactsAndPhones(orService, airTableService);
-            if (airTableContacts != null){
-                airTableService["contacts"] = airTableContacts;
-            }else{ airTableService["contacts"] = []; }
-
-            //Post service_at_location info
+        }
+        catch(error){
+            console.log("Error posting contacts " + error.message);
+        }
+        if (airTableContacts != null){
+            airTableService["contacts"] = airTableContacts;
+        }else{ airTableService["contacts"] = []; }
+        //Post service_at_location info
+        try{
             await postServiceAtLoction(orService, airTableService);
-        }catch(error){console.log(error.message);}
+        }
+        catch(error){
+            console.log("Error posting service at locations " + error.message);
+        }
     }
 }
 
 async function postServiceAtLoction(orService, airTableService){
     serviceAtLocations = orService["service_at_locations"]
+    let postedLocationIdDict = {};
     for(let i = 0; i < serviceAtLocations.length; i++){
         contacts = []
         phones = []
@@ -164,9 +180,19 @@ async function postServiceAtLoction(orService, airTableService){
 
             
         //schedules
-        airTableSchedules = postSchedules(serviceAtLocations[i], airTableServiceAtLocation, airTableService);
+        airTableSchedules = await postSchedules(serviceAtLocations[i], airTableServiceAtLocation, airTableService);
         //locations
-        airTableLocation = postLocation(serviceAtLocations[i], airTableSchedules, airTableService)
+        if(!postedLocationIdDict[serviceAtLocations[i]["location"]["id"]]){
+            airTableLocation = await postLocation(serviceAtLocations[i], airTableSchedules, airTableService, airTableServiceAtLocation)
+            postedLocationIdDict[serviceAtLocations[i]["location"]["id"]] = {
+                airTableId: airTableLocation["id"],
+                airTableServiceAtLocations: [airTableServiceAtLocation["id"]],
+            }
+        }else{
+            postedLocationIdDict[serviceAtLocations[i]["location"]["id"]]["airTableServiceAtLocations"].push(airTableServiceAtLocation["id"])
+            updateLocation(serviceAtLocations[i], airTableServiceAtLocation, postedLocationIdDict);
+        }
+        
 
     }
 
@@ -175,7 +201,7 @@ async function postServiceAtLoction(orService, airTableService){
 async function postSchedules(serviceAtLocation, airTableServiceAtLocation){
     airTableSchedules = [];
     for (let i=0; i<serviceAtLocation["regular_schedule"].length; i++){
-        schedule = serviceAtLocations["regular_schedule"][0];
+        schedule = serviceAtLocation["regular_schedule"][i];
         schedule["services"] = [airTableService["id"]];
         schedule["service_at_location"] = [airTableServiceAtLocation["id"]];
         schedule["closes_at"] = convertTime(schedule["closes_at"]);
@@ -190,7 +216,7 @@ async function postSchedules(serviceAtLocation, airTableServiceAtLocation){
     return airTableSchedules;
 }
 
-async function postLocation(serviceAtLocation, airTableSchedules, airTableService){
+async function postLocation(serviceAtLocation, airTableSchedules, airTableService, airTableServiceAtLocation){
     location = {
         fields: {
             name: serviceAtLocation["location"]["name"],
@@ -203,10 +229,10 @@ async function postLocation(serviceAtLocation, airTableSchedules, airTableServic
             description: serviceAtLocation["location"]?.description,
         }
     }
-    if(serviceAtLocation[i]["location"].latitude){
+    if(serviceAtLocation["location"].latitude){
         location["fields"]["latitude"] = String(serviceAtLocation["location"]["latitude"]);
     }
-    if(serviceAtLocation[i]["location"].longitude){
+    if(serviceAtLocation["location"].longitude){
         location["fields"]["longitude"] = String(serviceAtLocation["location"]["longitude"])
     }
     location.fields = removeNullFields(location.fields);
@@ -214,6 +240,15 @@ async function postLocation(serviceAtLocation, airTableSchedules, airTableServic
     airTableLocation = await postToAirtable(baseId, locationsTableId, JSON.stringify(body));
     airTableLocation = airTableLocation?.records[0];
     return airTableLocation;
+}
+
+async function updateLocation(serviceAtLocation, airTableServiceAtLocation, postedLocationIdDict){
+    location = {
+        fields: {
+            service_at_location: postedLocationIdDict[serviceAtLocation["location"]["id"]]["airTableServiceAtLocations"]
+        }
+    }
+    airTableLocation = await updateAirtableRecord(baseId, locationsTableId, postedLocationIdDict[serviceAtLocation["location"]["id"]]["airTableId"] , JSON.stringify(location))
 }
 
 function removeNullFields(object){
@@ -336,3 +371,23 @@ async function postToAirtable(baseID, tableID, body) {
         throw error;
     }
   }
+
+async function updateAirtableRecord(baseID, tableID, recordID, body){
+    const airTableUrl = `https://api.airtable.com/v0/${baseID}/${tableID}/${recordID}`;
+    try {
+      const response = await axios.patch(airTableUrl, body, {
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+  
+      return response.data;
+    } catch (error) {
+        if (error.response) {
+            console.log("Error occurred while patching", error.response.data);
+        } else {
+            console.log("Error occurred while patching", error.message);
+        }
+    }
+}
