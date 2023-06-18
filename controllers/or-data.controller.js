@@ -185,7 +185,14 @@ async function postServiceAtLoction(orService, airTableService){
                 phones: [airTableService["contacts"][0]["phones"][0]?.id],
                 schedules: [airTableSchedule?.id],
                 service_at_location: [airTableServiceAtLocation?.id],
+                description: serviceAtLocations[i]["location"]?.description,
             }
+        }
+        if(serviceAtLocations[i]["location"].latitude){
+            location["fields"]["latitude"] = String(serviceAtLocations[i]["location"]["latitude"]);
+        }
+        if(serviceAtLocations[i]["location"].longitude){
+            location["fields"]["longitude"] = String(serviceAtLocations[i]["location"]["longitude"])
         }
         location.fields = removeNullFields(location.fields);
         body = {records : [location]};
