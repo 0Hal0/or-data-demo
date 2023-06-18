@@ -60,7 +60,7 @@ exports.clearBase = async () => {
             );
           }
         } catch (error) {
-          console.log(error);
+          console.log("Error deleting record" + error.message);
           throw error;
         }
       }
@@ -75,7 +75,7 @@ async function getServicesOfType(type) {
         let services = response.data.content;
         return services;
     } catch (error) {
-        console.log(error);
+        console.log("Error getting services of type " + String(type) + error.message);
         throw error;
     }
 }
@@ -135,7 +135,7 @@ async function postServicesToEndpoint(orServices){
 
             //Post service_at_location info
             await postServiceAtLoction(orService, airTableService);
-        }catch(error){console.log(error);}
+        }catch(error){console.log(error.message);}
     }
 }
 
@@ -164,7 +164,18 @@ async function postServiceAtLoction(orService, airTableService){
 
             
         //schedules
-        schedule = serviceAtLocations[i]["regular_schedule"][0];
+        airTableSchedules = postSchedules(serviceAtLocations[i], airTableServiceAtLocation, airTableService);
+        //locations
+        airTableLocation = postLocation(serviceAtLocations[i], airTableSchedules, airTableService)
+
+    }
+
+}
+
+async function postSchedules(serviceAtLocation, airTableServiceAtLocation){
+    airTableSchedules = [];
+    for (let i=0; i<serviceAtLocation["regular_schedule"].length; i++){
+        schedule = serviceAtLocations["regular_schedule"][0];
         schedule["services"] = [airTableService["id"]];
         schedule["service_at_location"] = [airTableServiceAtLocation["id"]];
         schedule["closes_at"] = convertTime(schedule["closes_at"]);
@@ -174,33 +185,35 @@ async function postServiceAtLoction(orService, airTableService){
         schedule = removeNullFields(schedule);
         body = {records : [{fields : schedule}]};
         airTableSchedule = await postToAirtable(baseId, schedulesTableId, JSON.stringify(body));
-        airTableSchedule = airTableSchedule["records"][0];
-        //locations
-        location = {
-            fields: {
-                name: serviceAtLocations[i]["location"]["name"],
-                services: [airTableService["id"]],
-                organization: [airTableService["organization"]?.id],
-                contacts: [airTableService["contacts"][0]?.id],
-                phones: [airTableService["contacts"][0]["phones"][0]?.id],
-                schedules: [airTableSchedule?.id],
-                service_at_location: [airTableServiceAtLocation?.id],
-                description: serviceAtLocations[i]["location"]?.description,
-            }
-        }
-        if(serviceAtLocations[i]["location"].latitude){
-            location["fields"]["latitude"] = String(serviceAtLocations[i]["location"]["latitude"]);
-        }
-        if(serviceAtLocations[i]["location"].longitude){
-            location["fields"]["longitude"] = String(serviceAtLocations[i]["location"]["longitude"])
-        }
-        location.fields = removeNullFields(location.fields);
-        body = {records : [location]};
-        airTableLocation = await postToAirtable(baseId, locationsTableId, JSON.stringify(body));
-        airTableLocation = airTableLocation?.records[0];
-
+        airTableSchedules.push(airTableSchedule["records"][0]);
     }
+    return airTableSchedules;
+}
 
+async function postLocation(serviceAtLocation, airTableSchedules, airTableService){
+    location = {
+        fields: {
+            name: serviceAtLocation["location"]["name"],
+            services: [airTableService["id"]],
+            organization: [airTableService["organization"]?.id],
+            contacts: [airTableService["contacts"][0]?.id],
+            phones: [airTableService["contacts"][0]["phones"][0]?.id],
+            schedules: airTableSchedules.map(x => x?.id),
+            service_at_location: [airTableServiceAtLocation?.id],
+            description: serviceAtLocation["location"]?.description,
+        }
+    }
+    if(serviceAtLocation[i]["location"].latitude){
+        location["fields"]["latitude"] = String(serviceAtLocation["location"]["latitude"]);
+    }
+    if(serviceAtLocation[i]["location"].longitude){
+        location["fields"]["longitude"] = String(serviceAtLocation["location"]["longitude"])
+    }
+    location.fields = removeNullFields(location.fields);
+    body = {records : [location]};
+    airTableLocation = await postToAirtable(baseId, locationsTableId, JSON.stringify(body));
+    airTableLocation = airTableLocation?.records[0];
+    return airTableLocation;
 }
 
 function removeNullFields(object){
@@ -259,7 +272,7 @@ async function getService(serviceId){
         let service = response.data;
         return service;
     }catch (error){
-        console.log(error);
+        console.log("Error getting the service with ID" + String(serviceId) + " : " + error.message);
         throw error
     }
 }
@@ -315,9 +328,11 @@ async function postToAirtable(baseID, tableID, body) {
   
       return response.data;
     } catch (error) {
-        if (error.response){
-            console.log(error.response.data);
+        if (error.response) {
+            console.log("Error occurred while posting to Airtable:", error.response.data);
+        } else {
+            console.log("Error occurred while posting to Airtable:", error.message);
         }
-      throw error;
+        throw error;
     }
   }
