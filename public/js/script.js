@@ -50,11 +50,41 @@ async function getServiceTypes(){
 }
 
 async function update(){
+    msg = document.getElementById("message");
+    msg.innerHTML = "Sending services...";
+    msg.style.color = "#ffbf00";
+
     type = document.getElementById("service-type-input");
     type = document.getElementById(type.value);
-    result = await fetch(APP_URL + type.innerHTML, {method: "POST"})
+    try{
+        result = await fetch(APP_URL + type.innerHTML, {method: "POST"})
+    }
+    catch(error){
+        console.log("Error sending services");
+        result = {status: 500};
+    }
+
+    if (result.status == 500){
+        msg.style.color = "#ff0000";
+        msg.innerHTML = "Failed to send services";
+    }else{
+        msg.innerHTML = "Done";
+        msg.style.color = "#00ff00"
+    }
+    setTimeout(() => {document.getElementById("message").innerHTML = ""}, 1500);
 }
 
 async function clearBase(){
-    await fetch(APP_URL + "all", {method: "DELETE"});
+    msg = document.getElementById("message");
+    msg.innerHTML = "Clearing services...";
+    msg.style.color = "#ffbf00";
+    result = await fetch(APP_URL + "all", {method: "DELETE"});
+    if (result.status == 500){
+        msg.style.color = "#ff0000";
+        msg.innerHTML = "Failed to clear services";
+    }else{
+        msg.innerHTML = "Done";
+        msg.style.color = "#00ff00"
+    }
+    setTimeout(() => {document.getElementById("message").innerHTML = ""}, 1500);
 }

@@ -28,10 +28,10 @@ app.get("/", (req, res) => {
     res.status(200);
 });
 
-app.post("/:type", (req, res) =>{
+app.post("/:type", async (req, res) =>{
     let type = req.params.type;
     try{
-        orController.updateTables(type);
+        await orController.updateTables(type);
         res.status(201);
         res.send("Success");
     }catch(error){
@@ -42,9 +42,9 @@ app.post("/:type", (req, res) =>{
 
 })
 
-app.delete("/all", (req, res) =>{
+app.delete("/all", async (req, res) =>{
     try{
-        orController.clearBase();
+        await orController.clearBase();
         res.status(200);
         res.send("Success");
     }catch(error){
