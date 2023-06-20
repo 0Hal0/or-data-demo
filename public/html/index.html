@@ -10,14 +10,21 @@
 </head>
 <body onload="getServiceTypes()">
    <p id="test"></p> 
+   
 
+   <label>Service Type: </label>
    <div>
         <datalist id="service-type-suggestions">
         </datalist>
         <input id="service-type-input" autoComplete="on" list="service-type-suggestions"/> 
     </div>
 
-    <button onclick="update()">Update</button>
-    <button onclick="clearBase()">Clear</button>
+
+    <br>
+
+    <button onclick="update()">Send services</button>
+    <button onclick="clearBase()">Clear table</button>
+
+    <p id="message"></p>
 </body>
 </html>
