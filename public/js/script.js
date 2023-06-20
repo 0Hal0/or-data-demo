@@ -1,5 +1,5 @@
 SERVICE_TYPES_URI = "https://penninelancs.openplace.directory/o/ServiceDirectoryService/v2/taxonomies/?per_page=5000&vocabulary=esdServiceTypes";
-APP_URL = "http://localhost:3000/"
+APP_URL = "https://or-data-demo.azurewebsites.net/"
 
 async function getServiceTypes(){
     serviceTypes = await fetch(SERVICE_TYPES_URI)
